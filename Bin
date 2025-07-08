@@ -1,0 +1,95 @@
+# Smart Waste Bin Overflow Prediction - LSTM Example
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+
+# -----------------------------
+# 1. Load example data
+# -----------------------------
+# For demo, generate fake fill level data
+np.random.seed(0)
+
+days = 200  # number of days
+fill_levels = np.linspace(10, 100, days) + np.random.normal(0, 5, days)
+
+# Create DataFrame
+data = pd.DataFrame({'fill_level': fill_levels})
+
+# Plot raw data
+plt.plot(data['fill_level'])
+plt.title('Synthetic Bin Fill Level Data')
+plt.xlabel('Day')
+plt.ylabel('Fill Level (%)')
+plt.show()
+
+# -----------------------------
+# 2. Preprocess data
+# -----------------------------
+
+scaler = MinMaxScaler()
+data_scaled = scaler.fit_transform(data)
+
+# Create sequences for LSTM
+sequence_length = 10
+X, y = [], []
+
+for i in range(len(data_scaled) - sequence_length):
+    X.append(data_scaled[i:i+sequence_length])
+    y.append(data_scaled[i+sequence_length])
+
+X, y = np.array(X), np.array(y)
+
+# Train-test split
+split = int(len(X) * 0.8)
+X_train, X_test = X[:split], X[split:]
+y_train, y_test = y[:split], y[split:]
+
+# -----------------------------
+# 3. Build LSTM model
+# -----------------------------
+
+model = Sequential()
+model.add(LSTM(50, activation='relu', input_shape=(sequence_length, 1)))
+model.add(Dense(1))
+model.compile(optimizer='adam', loss='mse')
+
+# -----------------------------
+# 4. Train model
+# -----------------------------
+
+history = model.fit(X_train, y_train, epochs=30, batch_size=8, validation_data=(X_test, y_test))
+
+# Plot training loss
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Test Loss')
+plt.legend()
+plt.show()
+
+# -----------------------------
+# 5. Predict
+# -----------------------------
+
+y_pred = model.predict(X_test)
+y_test_inv = scaler.inverse_transform(y_test)
+y_pred_inv = scaler.inverse_transform(y_pred)
+
+# -----------------------------
+# 6. Evaluate & visualize
+# -----------------------------
+
+rmse = np.sqrt(mean_squared_error(y_test_inv, y_pred_inv))
+print(f'RMSE: {rmse:.2f}')
+
+plt.plot(y_test_inv, label='Actual')
+plt.plot(y_pred_inv, label='Predicted')
+plt.title('Bin Fill Level Prediction')
+plt.xlabel('Time Step')
+plt.ylabel('Fill Level (%)')
+plt.legend()
+plt.show()
